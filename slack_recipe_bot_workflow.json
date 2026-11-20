@@ -1,0 +1,392 @@
+{
+  "name": "AI Slack Recipe Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "trigger": [
+          "message"
+        ],
+        "channelId": {
+          "__rl": true,
+          "value": "C0CK3TWQWE9",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "79875fcb-3a00-434b-87d8-59e6b9194276",
+      "name": "Slack Trigger",
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -576
+      ],
+      "webhookId": "3f8fa0e4-e63b-492b-b0ea-a83a5d13de80",
+      "credentials": {
+        "slackApi": {
+          "id": "mxkpjkl9RfaDmhuf",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "recipe",
+              "type": "string",
+              "value": "={{ String($json.event?.text ?? $json.text ?? \"\").replace(/<@[A-Z0-9]+>/g, \"\").trim() }}"
+            },
+            {
+              "id": "c1",
+              "name": "channel",
+              "type": "string",
+              "value": "={{ $json.event?.channel ?? $json.channel ?? \"\" }}"
+            },
+            {
+              "id": "u1",
+              "name": "user",
+              "type": "string",
+              "value": "={{ $json.event?.user ?? $json.user ?? \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afdb271c-b6b4-4b0c-863c-81fccc3e44d4",
+      "name": "Capture Recipe Name",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.recipe }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a practical cooking assistant inside Slack. The user message is the name of a recipe. List all the products and ingredients needed to make it for 2 people, as a clear bulleted list (one '- ' bullet per line) with approximate quantities. Group by sensible headings written as plain lines like 'Vegetables:' only if the list is long. Keep it short and practical. No cooking instructions. Start with: 'To make <recipe> you'll need:'. If the text is not a recognizable dish or recipe, reply only with a polite one-line request asking the user to rephrase the recipe name."
+            }
+          ]
+        }
+      },
+      "id": "750654d9-db2f-4d69-8b70-88ace13c469f",
+      "name": "Generate Ingredient List",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        912,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "bb4e5ed2-dcca-4fee-aae4-46ff36b6fc45",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        912,
+        -352
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "rnrqlGSjr2wf7EyL",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst ctx = $('Capture Recipe Name').first().json;\nlet answer = String(item.text ?? item.response ?? item.output ?? '').trim();\nif (!answer) {\n  answer = 'Sorry, I could not prepare the ingredient list. Please try another recipe name.';\n}\nanswer = answer\n  .replace(/[*][*](.+?)[*][*]/g, '*$1*')\n  .replace(/^#{1,6}[ ]*(.+)$/gm, '*$1*')\n  .replace(/^[ ]*[-*][ ]+/gm, '• ');\nreturn [{ json: { channel: ctx.channel, slackMessage: answer } }];"
+      },
+      "id": "2a1dddd9-ad44-4943-9d27-5980d93ba617",
+      "name": "Format for Slack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "text": "={{ $json.slackMessage }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "ed19e522-0334-4b59-88a2-d739b19954d2",
+      "name": "Send Ingredient List",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1392,
+        -576
+      ],
+      "webhookId": "b50c5cda-cc2f-4746-b4c7-b6dde2a71d76",
+      "credentials": {
+        "slackApi": {
+          "id": "mxkpjkl9RfaDmhuf",
+          "name": "Slack account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "human-only",
+              "leftValue": "={{ !($json.event?.bot_id ?? $json.bot_id) && !($json.event?.subtype ?? $json.subtype) }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "620b6572-1a18-4368-be9d-7c32fd1ee8a2",
+      "name": "Ignore Bot Messages",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "recipe-not-empty",
+              "leftValue": "={{ $json.recipe }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "bd9667cc-682d-4115-abd4-c1ea202bbaa2",
+      "name": "Has Recipe Name?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "text": "I didn't catch a recipe name. Please type a dish, e.g. *Paneer Butter Masala*, and I'll list what you need.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "fa306c01-5cac-408d-82ea-1441238a3232",
+      "name": "Ask To Retry",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        -352
+      ],
+      "webhookId": "6441c8fe-c952-4187-bfe7-45caad6540ab",
+      "credentials": {
+        "slackApi": {
+          "id": "mxkpjkl9RfaDmhuf",
+          "name": "Slack account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Slack Trigger": [
+      {
+        "json": {
+          "type": "message",
+          "user": "U0CKBEPL0DS",
+          "ts": "1795194232.671449",
+          "client_msg_id": "4660cd3a-a270-48e9-87f8-ddf2fdfc1057",
+          "text": "<@U0CJTPTELUX> Paneer butter masala",
+          "team": "T0CK5QF4SBG",
+          "blocks": [
+            {
+              "type": "rich_text",
+              "block_id": "b3W77",
+              "elements": [
+                {
+                  "type": "rich_text_section",
+                  "elements": [
+                    {
+                      "type": "user",
+                      "user_id": "U0CJTPTELUX"
+                    },
+                    {
+                      "type": "text",
+                      "text": " Paneer butter masala"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "channel": "C0CK3TWQWE9",
+          "event_ts": "1795194232.671449",
+          "channel_type": "channel"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Generate Ingredient List": {
+      "main": [
+        [
+          {
+            "node": "Format for Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Ingredient List",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Slack": {
+      "main": [
+        [
+          {
+            "node": "Send Ingredient List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ignore Bot Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ignore Bot Messages": {
+      "main": [
+        [
+          {
+            "node": "Capture Recipe Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Recipe Name": {
+      "main": [
+        [
+          {
+            "node": "Has Recipe Name?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Recipe Name?": {
+      "main": [
+        [
+          {
+            "node": "Generate Ingredient List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask To Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "3d2a091d-ae46-49ad-9786-c63773cc1873",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "ca18382fd78710570b957a22959fd7e8d7be3ab6e5946d38b74628bbc232cb70"
+  },
+  "nodeGroups": [],
+  "id": "0M2RRO0WUjopuD8W",
+  "tags": []
+}
